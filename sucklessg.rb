@@ -151,7 +151,10 @@ module SucklessG
           temp = `mktemp --suffix .svg`.chomp
           File.open(temp,'w'){|io| io.write j['svg'] }
           disp_pid = spawn ("display #{temp}")
-          c=gets.chomp
+          puts "Captcha is being displayed, please type the captcha text and press enter.\n\n"
+          print "captcha > "
+          c=$stdin.gets.chomp
+          p c
           Process.kill("TERM",disp_pid)
           req = Net::HTTP::Post.new(mkuri('post'), { 'Content-Type' => 'application/json', 'Cookie' => cookie })
           req_body ={content: content, captcha: c}
@@ -174,7 +177,7 @@ module SucklessG
       Post::Post.new(write_post(),reply_to_id)
     end
     def write_post()
-      editors = [ `which #{ENV['EDITOR']}`, `which emacs`, `which vi`, `which nano` ].map{|e|e.chomp}
+      editors = [ ENV['EDITOR'], 'emacs', 'vi', 'nano' ].map{|e|`which #{e} 2>/dev/null`.chomp}
       editor = nil
       editors.each do |epath|
         if File.executable?(epath)
