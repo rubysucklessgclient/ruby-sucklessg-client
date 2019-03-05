@@ -134,6 +134,7 @@ module SucklessG
     class Post
       include SucklessG::Common
       def initialize(content,reply_to=nil)
+        # TODO: move captcha and session/cookie handling out of this method
         uri = mkuri('captcha')
         Net::HTTP.start(uri.host,uri.port,use_ssl:true) do |http|
           req = Net::HTTP::Get.new uri
@@ -158,6 +159,30 @@ module SucklessG
       end
     end
 
+  end
+
+  class Writer
+    class NoEditorException < Exception ; end
+    def initialize(reply_to_id=nil)
+      Post::Post.new(write_post(),reply_to_id)
+    end
+    def write_post()
+      editors = [ `which #{ENV['EDITOR']}`, `which emacs`, `which vi`, `which nano` ].map{|e|e.chomp}
+      editor = nil
+      editors.each do |epath|
+        if File.executable?(epath)
+          editor = epath
+          break
+        end
+      end
+      raise NoEditorException if editor.nil?
+
+      t=`mktemp`.chomp
+      p=spawn("#{editor} #{t}")
+      Process.wait(p)
+      content=File.read(t)
+      return content
+    end
   end
 
 
@@ -187,12 +212,7 @@ module SucklessG
       write: [
         "[reply_to_id]",
         "write a post, optionally in response to a post ID\n\tuses $EDITOR to write the post\n\tthen uses `display` from imagemagick to show the captcha image, when you type the captcha text and hit enter the post will send.\n\tright now, responding to posts doesn't seem to work",
-        ->(reply_to_id=nil) {
-          t=`mktemp`.chomp
-          p=spawn("#{ENV['EDITOR']} #{t}")
-          Process.wait(p)
-          content=File.read(t)
-          Post::Post.new(content,reply_to_id)}
+        ->(reply_to_id=nil) { Writer.new(reply_to_id) }
 
       ],
       captcha: [
