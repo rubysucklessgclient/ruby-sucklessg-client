@@ -1,0 +1,11 @@
+Extremely simple ruby script to interact with https://sucklessg.org
+
+Requires only standard ruby libraries for reading threads and posts.
+
+For writing a post, the program requires imagemagick to display the captcha, and requires an editor program. By default it tries $EDITOR, emacs, vi and nano. You can set EDITOR to something like kate, gvim, or gedit for a gui editor. The script also depends on `mktemp` which should be available on any linux distro by default. 
+
+In the future, if this website doesn't die, all dependencies will be stripped out of the script other than Ruby, and post reading/writing will be made easier and more interactive.
+
+The script can be run in interactive mode (by starting it with no arguments), or commands can be passed from cli like `./sucklessg.rb write 6dac5df5-0454-498b-b8cc-a536a50586bd` (which would write a reply to the specified post with that UUID)
+
+Pull requests welcome. I understand the code isn't very readable. I will work on that if there is any interest. I don't know if this whole thing will have any continued interest though.
