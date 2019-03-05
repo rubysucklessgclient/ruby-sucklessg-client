@@ -50,7 +50,9 @@ module SucklessG
     end
 
     def warn(*strs)
+      print "\e[0;33m"
       $stderr.puts strs
+      print "\e[0;0m"
     end
 
   end
@@ -195,14 +197,20 @@ module SucklessG
     include Common
     ExitCmd=[
         "",
-        "",
+        "exit the program. You can also press Ctrl+D or Ctrl+C",
         -> { exit }
     ]
     Commands = {
       help: [
         "[command]",
         "get help in general or for the specific command",
-        -> { ["read the source code to actually know...\n\n",'command help format:',"*cmd* *arguments*\n\t[description]\n\t","\n"] + SucklessG::UI::Commands.map{|k,v| "#{k} #{v[0]}\n\t#{v[1]}\n\n" }}
+        ->(cmd=nil) { 
+          if cmd.nil?
+            return ["read the source code to actually know...\n\n",'command help format:',"*cmd* *arguments*\n\t[description]\n\t","\n"] + SucklessG::UI::Commands.map{|k,v| "#{k} #{v[0]}\n\t#{v[1]}\n\n" }
+          else
+            return 'command specific help not implemented'
+          end
+        }
       ],
       page: [
         "n",
@@ -230,11 +238,12 @@ module SucklessG
       quit: ExitCmd,
       exit: ExitCmd,
     }
-    WelcomeText = "SucklessG in ruby...\n\n"
+    WelcomeText = "SucklessG in ruby...\nType 'help' for a list of commands\n\n"
     BadCommand = "Command %s does not exist or was typed incorrectly."
     InputLine = '> '
 
     def initialize(running=true)
+      check_environment()
       puts WelcomeText
       @running = running
       while @running
@@ -245,6 +254,19 @@ module SucklessG
         else
           input = input.chomp.split(' ')
           self.run(*input)
+        end
+      end
+    end
+
+    def check_environment()
+      executables = {
+        ENV['EDITOR'] => "$EDITOR is not set. Writing a post requires a text editor. The script will try emacs, vi and nano, otherwise raise an error. It's recommended to set the EDITOR environment variable.",
+        'display' => "ImageMagick `display` command is not available. To write a post imagemagick's display is required to show the captcha. At the moment, this is the only way the script can display the captcha. Writing a post will be impossible without imagemagick installed",
+        'mktemp' => "The mktemp program is not available. Writing a post will be broken without this program. It's possible to refactor this script to work without mktemp but that is currently not the case"
+      }
+      executables.each do |program,warning|
+        unless File.executable?(`which #{program} 2>/dev/null`.chomp)
+          warn "#{warning}\n\n"
         end
       end
     end
