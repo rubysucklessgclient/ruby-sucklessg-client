@@ -26,6 +26,19 @@ module SucklessG
       end
     end
 
+    def format_thread_post(post)
+      "%{id}\n%{wrote} wrote on %{created} %{rt}%{replies}:\n\t%{content}" % {
+        id: post["id"],
+        wrote: post["wrote"],
+        #created: DateTime.iso8601(post["created"]).strftime('%Y-%m-%d %H%M'),
+        created: post["created"],
+        rt: post["reply_to"].nil? ? "" : "\nin reply to #{post["reply_to"]} ",
+        replies: post.include?("replies") ? "\n(#{post["replies"]} replies)" : "",
+        content: post["content"].gsub(?\n,"\n\t"),
+      }
+    end
+
+
     if $DEBUG
       def debug(*strs)
         $stderr.puts strs
@@ -70,20 +83,6 @@ module SucklessG
         return ret
       end
 
-      def format_thread_post(post)
-        " %{id} \n %{wrote} wrote on %{created} %{rt} \n (%{replies} replies):
-        %{content}
-        " % {
-          id: post["id"],
-          wrote: post["wrote"],
-          #created: DateTime.iso8601(post["created"]).strftime('%Y-%m-%d %H%M'),
-          created: post["created"],
-          rt: post["reply_to"].nil? ? "" : "\n in reply to #{post["reply_to"]}",
-          replies: post["replies"],
-          content: post["content"],
-        }
-      end
-
       def to_s
         @json.map{|post|
           format_thread_post(post)
@@ -106,6 +105,12 @@ module SucklessG
 
       def [](a)
         @json[a]
+      end
+
+      def to_s()
+        @json.map{|post|
+          format_thread_post(post)
+        }.join("\n\n")
       end
 
     end
@@ -207,7 +212,7 @@ module SucklessG
       read: [
         "uuid",
         "read the post of specified uuid\n\tright now, this always returns an error",
-        ->(id) { Get::Post.new(id).json.to_s }
+        ->(id) { Get::Post.new(id).to_s }
       ],
       write: [
         "[reply_to_id]",
@@ -225,7 +230,7 @@ module SucklessG
       quit: ExitCmd,
       exit: ExitCmd,
     }
-    WelcomeText = "SucklessG in ruby..."
+    WelcomeText = "SucklessG in ruby...\n\n"
     BadCommand = "Command %s does not exist or was typed incorrectly."
     InputLine = '> '
 
