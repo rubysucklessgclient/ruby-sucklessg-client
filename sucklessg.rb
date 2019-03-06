@@ -254,27 +254,58 @@ module SucklessG
 
   class UI
     include Common
-    ExitCmd=[
-        "",
-        "exit the program. You can also press Ctrl+D or Ctrl+C",
-        -> { exit }
-    ]
-    Commands = {
-      help: [
-        "[command]",
-        "get help in general or for the specific command",
-        ->(cmd=nil) {
+    Commands = {}
+    Command = Class.new do
+      attr_reader :name, :arg_help, :description, :function
+      attr_accessor :is_alias,:alias_of
+      def initialize(**argh)
+        @name=argh[:name]
+        @aliases=argh[:aliases]
+        @arg_help=argh[:arg_help]
+        @description=argh[:description]
+        @function=argh[:function]
+        @is_alias=false
+        Commands[@name]=self
+        unless @aliases.nil?
+          @aliases.each do |a|
+            x=self.dup
+            x.is_alias = true
+            x.alias_of = @name
+            Commands[a]=x
+          end
+        end
+      end
+      def call(*args)
+        @function.call(*args)
+      end
+    end
+    Command.new({
+      name: :help,
+      arg_help: "[command]",
+      description: "get help in general or for the specific command",
+      function: ->(cmd=nil) {
           if cmd.nil?
-            return ["read the source code to actually know...\n\n",'command help format:',"*cmd* *arguments*\n\t[description]\n\t","\n"] + SucklessG::UI::Commands.map{|k,v| "#{k} #{v[0]}\n\t#{v[1].gsub(?\n,"\n\t")}\n\n" }
+            return [
+              "read the source code to actually know...\n\n",
+              'command help format:',
+              "*cmd* *arguments*\n\t[description]\n\t","\n"
+            ]+SucklessG::UI::Commands.map{|name,command|
+              if command.is_alias
+                "#{name} is an alias of #{command.alias_of}"
+              else
+                "#{name} #{command.arg_help}\n\t#{command.description.gsub(?\n,"\n\t")}\n\n"
+              end
+            }
           else
-            return 'command specific help not implemented'
+            return 'command-specific help not implemented'
           end
         }
-      ],
-      config: [
-        "[key] [value]",
-        "without arguments, list configuration options and their values\nwith key and no value, show configuration option and it's current value.\nwith key and value, set the specified option to the specified value.",
-        ->(key=nil, value=nil) {
+    })
+    Command.new({
+      name: :config,
+      arg_help: "[key] [value]",
+      description: "without arguments, list configuration options and their values\nwith key and no value, show configuration option and it's current value.\nwith key and value, set the specified option to the specified value.",
+      function: ->(key=nil, value=nil) {
           out = []
           if key.nil? && value.nil?
             Config::Options.each do |option|
@@ -289,33 +320,39 @@ module SucklessG
           end
           return out
         }
-      ],
-      page: [
-        "n",
-        "get page of a specified number",
-        ->(n) { Get::Page.new(n).to_s }
-      ],
-      read: [
-        "uuid",
-        "read the post of specified uuid\nright now, this always returns an error",
-        ->(id) { Get::Post.new(id).to_s }
-      ],
-      write: [
-        "[reply_to_id]",
-        "write a post, optionally in response to a post ID\nuses $EDITOR to write the post\nthen uses `display` from imagemagick to show the captcha image, when you type the captcha text and hit enter the post will send.\nright now, responding to posts doesn't seem to work",
-        ->(reply_to_id=nil) { Writer.new(reply_to_id) }
-
-      ],
-      captcha: [
-        "",
-        "useless function at the moment. captcha is shown when using 'write' command instead",
-        ->(){
+    })
+    Command.new({
+      name: :page,
+      arg_help: "n",
+      description: "get page of a specified number",
+      function: ->(n) { Get::Page.new(n).to_s }
+    })
+    Command.new({
+      name: :read,
+      arg_help: "uuid",
+      description: "read the post of specified uuid\nright now, this always returns an error",
+      function: ->(id) { Get::Post.new(id).to_s }
+    })
+    Command.new({
+      name: :write,
+      arg_help: "[reply_to_id]",
+      description: "write a post, optionally in response to a post ID\nuses $EDITOR to write the post\nthen uses `display` from imagemagick to show the captcha image, when you type the captcha text and hit enter the post will send.\nright now, responding to posts doesn't seem to work",
+      function: ->(reply_to_id=nil) { Writer.new(reply_to_id) }
+    })
+    Command.new({
+      name: :captcha,
+      description: "useless function at the moment. captcha is shown when using 'write' command instead",
+      function: ->(){
           Get::Captcha.new
         }
-      ],
-      quit: ExitCmd,
-      exit: ExitCmd,
-    }
+    })
+    Command.new({
+      name: :quit,
+      aliases: [:exit],
+      description: "exit the program. You can also press Ctrl+D or Ctrl+C",
+      function: -> { exit }
+    })
+
     WelcomeText = "SucklessG in ruby...\nType 'help' for a list of commands\n\n"
     BadCommand = "Command %s does not exist or was typed incorrectly."
     InputLine = '> '
@@ -352,7 +389,7 @@ module SucklessG
     def run(*args)
       cmd = args.shift.to_sym
       if Commands.include?(cmd)
-        puts Commands[cmd].last.call(*args)
+        puts Commands[cmd].call(*args)
       else
         warn (BadCommand % [cmd,*args])
       end
