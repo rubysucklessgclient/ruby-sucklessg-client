@@ -10,6 +10,62 @@ module SucklessG
 
   Domain='sucklessg.org'
 
+  module Config
+
+    # lazy code, but basically, use XDG_CONFIG_HOME/sucklessg first,
+    # if XDG_CONFIG_HOME is not set, try ~/.config/sucklessg
+    # if ~/.config/sucklessg does not work,
+    # if ~/.sucklessg does not work,
+    # use ./.sucklessg
+    if File.exist?(ENV['XDG_CONFIG_HOME'] ? ENV['XDG_CONFIG_HOME'] : '')
+      config_dir = File.join(ENV['XDG_CONFIG_HOME'],'sucklessg')
+    elsif (! ENV['HOME'].nil? ) && File.exist?(File.join(ENV['HOME'],'.config'))
+      config_dir = File.join(ENV['HOME'],'.config','sucklessg')
+    elsif (! ENV['HOME'].nil? )
+      config_dir = File.join(ENV['HOME'],'.sucklessg')
+    else
+      config_dir = File.join('.','.sucklessg')
+    end
+    RC_FILE = File.join(config_dir,'config.json')
+    Options=[]
+    Option=Class.new do
+      attr_reader :name, :default, :description, :example
+      attr_accessor :value
+      def initialize(**argh)
+        @name=argh[:name]
+        @default=argh[:default]
+        @value=argh[:default]
+        @description=argh[:description]
+        @example=argh[:example]
+        Config::Options << self
+      end
+    end
+    Option.new({
+      name: :captcha_viewer,
+      default: 'display',
+      description: 'command to view captcha images with (must support SVG)',
+      example: '`display`, or `firefox` would work',
+    })
+    Option.new({
+      name: :editor,
+      default: nil,
+      description: 'command to use for writing posts. by default this is unset and $EDITOR is used. fallbacks are emacs, vi, and nano',
+      example: '`gvim`, `nvim`, `emacs`, `kate`, `gedit` or any other plain text editor. leave this unset to use $EDITOR from the environment',
+    })
+    Option.new({
+      name: :post_format,
+      default: :default,
+      description: 'formatting method for displaying posts. at the moment, there is only the default built-in formatter',
+      example: ':default',
+    })
+    Option.new({
+      name: :debug,
+      default: false,
+      description: 'whether or not to show debugging messages',
+      example: 'true or false',
+    })
+  end
+
 
   module Common
 
@@ -207,12 +263,31 @@ module SucklessG
       help: [
         "[command]",
         "get help in general or for the specific command",
-        ->(cmd=nil) { 
+        ->(cmd=nil) {
           if cmd.nil?
-            return ["read the source code to actually know...\n\n",'command help format:',"*cmd* *arguments*\n\t[description]\n\t","\n"] + SucklessG::UI::Commands.map{|k,v| "#{k} #{v[0]}\n\t#{v[1]}\n\n" }
+            return ["read the source code to actually know...\n\n",'command help format:',"*cmd* *arguments*\n\t[description]\n\t","\n"] + SucklessG::UI::Commands.map{|k,v| "#{k} #{v[0]}\n\t#{v[1].gsub(?\n,"\n\t")}\n\n" }
           else
             return 'command specific help not implemented'
           end
+        }
+      ],
+      config: [
+        "[key] [value]",
+        "without arguments, list configuration options and their values\nwith key and no value, show configuration option and it's current value.\nwith key and value, set the specified option to the specified value.",
+        ->(key=nil, value=nil) {
+          out = []
+          if key.nil? && value.nil?
+            Config::Options.each do |option|
+              out << "#{option.name}=#{option.value}"
+            end
+          elsif value.nil?
+            value = Config::Options.select { |option| option.name == key.to_sym }.first.value
+            out << "#{key}=#{value}"
+          else
+            Config::Options.select{|option| option.name == key.to_sym}.first.value=value
+            out << "Option '#{key}' set to '#{value}'"
+          end
+          return out
         }
       ],
       page: [
@@ -222,12 +297,12 @@ module SucklessG
       ],
       read: [
         "uuid",
-        "read the post of specified uuid\n\tright now, this always returns an error",
+        "read the post of specified uuid\nright now, this always returns an error",
         ->(id) { Get::Post.new(id).to_s }
       ],
       write: [
         "[reply_to_id]",
-        "write a post, optionally in response to a post ID\n\tuses $EDITOR to write the post\n\tthen uses `display` from imagemagick to show the captcha image, when you type the captcha text and hit enter the post will send.\n\tright now, responding to posts doesn't seem to work",
+        "write a post, optionally in response to a post ID\nuses $EDITOR to write the post\nthen uses `display` from imagemagick to show the captcha image, when you type the captcha text and hit enter the post will send.\nright now, responding to posts doesn't seem to work",
         ->(reply_to_id=nil) { Writer.new(reply_to_id) }
 
       ],
